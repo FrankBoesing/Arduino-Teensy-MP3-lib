@@ -1,68 +1,68 @@
 /*
-	Arduino Audiocodecs
+   Arduino Audiocodecs
 
-	Copyright (c) 2014 Frank Bösing
+   Copyright (c) 2014 Frank Bösing
 
-	This library is free software: you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation, either version 3 of the License, or
-	(at your option) any later version.
+   This library is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
 
-	This library is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
+   This library is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
 
-	You should have received a copy of the GNU General Public License
-	along with this library.  If not, see <http://www.gnu.org/licenses/>.
+   You should have received a copy of the GNU General Public License
+   along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-	The helix decoder itself as a different license, look at the subdirectories for more info.
+   The helix decoder itself as a different license, look at the subdirectories for more info.
 
-	Diese Bibliothek ist freie Software: Sie können es unter den Bedingungen
-	der GNU General Public License, wie von der Free Software Foundation,
-	Version 3 der Lizenz oder (nach Ihrer Wahl) jeder neueren
-	veröffentlichten Version, weiterverbreiten und/oder modifizieren.
+   Diese Bibliothek ist freie Software: Sie können es unter den Bedingungen
+   der GNU General Public License, wie von der Free Software Foundation,
+   Version 3 der Lizenz oder (nach Ihrer Wahl) jeder neueren
+   veröffentlichten Version, weiterverbreiten und/oder modifizieren.
 
-	Diese Bibliothek wird in der Hoffnung, dass es nützlich sein wird, aber
-	OHNE JEDE GEWÄHRLEISTUNG, bereitgestellt; sogar ohne die implizite
-	Gewährleistung der MARKTFÄHIGKEIT oder EIGNUNG FÜR EINEN BESTIMMTEN ZWECK.
-	Siehe die GNU General Public License für weitere Details.
+   Diese Bibliothek wird in der Hoffnung, dass es nützlich sein wird, aber
+   OHNE JEDE GEWÄHRLEISTUNG, bereitgestellt; sogar ohne die implizite
+   Gewährleistung der MARKTFÄHIGKEIT oder EIGNUNG FÜR EINEN BESTIMMTEN ZWECK.
+   Siehe die GNU General Public License für weitere Details.
 
-	Sie sollten eine Kopie der GNU General Public License zusammen mit diesem
-	Programm erhalten haben. Wenn nicht, siehe <http://www.gnu.org/licenses/>.
+   Sie sollten eine Kopie der GNU General Public License zusammen mit diesem
+   Programm erhalten haben. Wenn nicht, siehe <http://www.gnu.org/licenses/>.
 
-	Der Helixdecoder selbst hat eine eigene Lizenz, bitte für mehr Informationen
-	in den Unterverzeichnissen nachsehen.
+   Der Helixdecoder selbst hat eine eigene Lizenz, bitte für mehr Informationen
+   in den Unterverzeichnissen nachsehen.
 
  */
 
- /* The Helix-Library is modified for Teensy 3.1 */
+/* The Helix-Library is modified for Teensy 3.1 */
 
- // Total RAM Usage: 31 KB
+// Total RAM Usage: 31 KB
 
 #include "play_sd_aac.h"
 #include "common/assembly.h"
 
-#define AAC_SD_BUF_SIZE	3072 								//Enough space for a complete stereo frame
-//#define AAC_SD_BUF_SIZE	2560 								//Enough space for a complete stereo frame
+#define AAC_SD_BUF_SIZE 3072                //Enough space for a complete stereo frame
+//#define AAC_SD_BUF_SIZE	2560                //Enough space for a complete stereo frame
 //#define AAC_SD_BUF_SIZE	(1536 + 768)
-#define AAC_BUF_SIZE	(AAC_MAX_NCHANS * AAC_MAX_NSAMPS)	//AAC output buffer
+#define AAC_BUF_SIZE  (AAC_MAX_NCHANS * AAC_MAX_NSAMPS) //AAC output buffer
 
-#define DECODE_NUM_STATES 2									//How many steps in decode() ?
+#define DECODE_NUM_STATES 2                 //How many steps in decode() ?
 #define CODEC_DEBUG
 
-static AudioPlaySdAac 	*aacobjptr;
+static AudioPlaySdAac   *aacobjptr;
 void decodeAac(void);
 
 void AudioPlaySdAac::stop(void)
 {
-	NVIC_DISABLE_IRQ(IRQ_AUDIOCODEC);
+	NVIC_DISABLE_IRQ(irq_audiocodec);
 
 	playing = codec_stopped;
-	if (buf[1]) {free(buf[1]);buf[1] = NULL;}
-	if (buf[0]) {free(buf[0]);buf[0] = NULL;}
+	if (buf[1]) {free(buf[1]); buf[1] = NULL;}
+	if (buf[0]) {free(buf[0]); buf[0] = NULL;}
 	freeBuffer();
-	if (hAACDecoder) {AACFreeDecoder(hAACDecoder);hAACDecoder=NULL;};
+	if (hAACDecoder) {AACFreeDecoder(hAACDecoder); hAACDecoder = NULL;};
 	fclose();
 }
 
@@ -106,10 +106,10 @@ _ATOM AudioPlaySdAac::findMp4Atom(const char *atom, const uint32_t posi, const b
 		fread((uint8_t *) &atomInfo, sizeof(atomInfo));
 		ret.size = REV32(atomInfo.size);
 		//ret.size = atomInfo.size;
-		if (strncmp(atom, atomInfo.name, 4)==0){
+		if (strncmp(atom, atomInfo.name, 4) == 0) {
 			return ret;
 		}
-		ret.position += ret.size ;
+		ret.position += ret.size;
 	} while (loop && r);
 	ret.position = 0;
 	ret.size = 0;
@@ -119,7 +119,7 @@ _ATOM AudioPlaySdAac::findMp4Atom(const char *atom, const uint32_t posi, const b
 
 bool AudioPlaySdAac::setupMp4(void)
 {
-	_ATOM ftyp = findMp4Atom("ftyp",0, false);
+	_ATOM ftyp = findMp4Atom("ftyp", 0, false);
 	if (!ftyp.size)
 		return false; //no mp4/m4a file
 
@@ -248,17 +248,17 @@ int AudioPlaySdAac::play(void){
 		return lastError;
 	}
 
-	_VectorsRam[IRQ_AUDIOCODEC + 16] = &decodeAac;
-	initSwi();
+	_VectorsRam[irq_audiocodec + 16] = &decodeAac;
+	initSwi(irq_audiocodec);
 
 	decoded_length[0] = 0;
 	decoded_length[1] = 0;
 	decoding_state = 0;
 	decoding_block = 0;
 
-	for (int i=0; i< DECODE_NUM_STATES; i++) decodeAac();
+	for (int i = 0; i < DECODE_NUM_STATES; i++) decodeAac();
 
-	if((aacFrameInfo.sampRateOut != AUDIOCODECS_SAMPLE_RATE ) || (aacFrameInfo.nChans > 2)) {
+	if ((aacFrameInfo.sampRateOut != AUDIOCODECS_SAMPLE_RATE ) || (aacFrameInfo.nChans > 2)) {
 		//Serial.println("incompatible AAC file.");
 		lastError = ERR_CODEC_FORMAT;
 		stop();
@@ -268,18 +268,18 @@ int AudioPlaySdAac::play(void){
 	decoding_block = 1;
 
 	playing = codec_playing;
-	
+
 #ifdef CODEC_DEBUG
 //	Serial.printf("RAM: %d\r\n",ram-freeRam());
 #endif
-    return lastError;
+	return lastError;
 }
 
 //runs in ISR
 void AudioPlaySdAac::update(void)
 {
-	audio_block_t	*block_left;
-	audio_block_t	*block_right;
+	audio_block_t *block_left;
+	audio_block_t *block_right;
 
 	//paused or stopped ?
 	if (playing  != codec_playing) return;
@@ -289,17 +289,17 @@ void AudioPlaySdAac::update(void)
 	//if the swi is not active currently.
 	//In addition, check before if there waits work for it.
 	int db = decoding_block;
-	if (!NVIC_IS_ACTIVE(IRQ_AUDIOCODEC))
-		if (decoded_length[db]==0)
-			NVIC_TRIGGER_INTERRUPT(IRQ_AUDIOCODEC);
+	if (!NVIC_IS_ACTIVE(irq_audiocodec))
+		if (decoded_length[db] == 0)
+			NVIC_TRIGGER_INTERRUPT(irq_audiocodec);
 
 	//determine the block we're playing from
 	int playing_block = 1 - db;
 	if (decoded_length[playing_block] <= 0)
-		{
-			stop();
-			return;
-		}
+	{
+		stop();
+		return;
+	}
 
 	// allocate the audio blocks to transmit
 	block_left = allocate();
@@ -318,7 +318,7 @@ void AudioPlaySdAac::update(void)
 
 		memcpy_frominterleaved(block_left->data, block_right->data, buf[playing_block] + pl);
 
-		pl += AUDIO_BLOCK_SAMPLES * 2 ;
+		pl += AUDIO_BLOCK_SAMPLES * 2;
 		transmit(block_left, 0);
 		transmit(block_right, 1);
 		release(block_right);
@@ -347,7 +347,7 @@ void AudioPlaySdAac::update(void)
 		decoding_block = playing_block;
 		play_pos = 0;
 	} else
-	play_pos = pl;
+		play_pos = pl;
 
 }
 
@@ -364,50 +364,50 @@ void decodeAac(void)
 	switch (o->decoding_state) {
 
 	case 0:
-		{
+	{
 
-			o->sd_left = o->fillReadBuffer( o->file, o->sd_buf, o->sd_p, o->sd_left, AAC_SD_BUF_SIZE);
-			if (!o->sd_left) { eof = true; goto aacend; }
-			o->sd_p = o->sd_buf;
+		o->sd_left = o->fillReadBuffer( o->file, o->sd_buf, o->sd_p, o->sd_left, AAC_SD_BUF_SIZE);
+		if (!o->sd_left) { eof = true; goto aacend; }
+		o->sd_p = o->sd_buf;
 
-			uint32_t cycles_rd = ARM_DWT_CYCCNT - cycles;
-			if (cycles_rd > o->decode_cycles_max_read ) o->decode_cycles_max_read = cycles_rd;
-			break;
-		}
+		uint32_t cycles_rd = ARM_DWT_CYCCNT - cycles;
+		if (cycles_rd > o->decode_cycles_max_read ) o->decode_cycles_max_read = cycles_rd;
+		break;
+	}
 
 	case 1:
-		{
-			if (o->isRAW) {
+	{
+		if (o->isRAW) {
 
-				// find start of next AAC frame - assume EOF if no sync found
-				int offset = AACFindSyncWord(o->sd_p, o->sd_left);
+			// find start of next AAC frame - assume EOF if no sync found
+			int offset = AACFindSyncWord(o->sd_p, o->sd_left);
 
-				if (offset < 0) {
-					eof = true;
-					goto aacend;
-				}
-
-				o->sd_p += offset;
-				o->sd_left -= offset;
-
-			}
-
-			int decode_res = AACDecode(o->hAACDecoder, &o->sd_p, (int*)&o->sd_left, o->buf[db]);
-
-			if (!decode_res) {
-				AACGetLastFrameInfo(o->hAACDecoder, &o->aacFrameInfo);
-				o->decoded_length[db] = o->aacFrameInfo.outputSamps;
-			} else {
-				AudioPlaySdAac::lastError = decode_res;
+			if (offset < 0) {
 				eof = true;
-				//goto aacend;
+				goto aacend;
 			}
 
-			//if (!o->isRAW && (o->fposition() > o->lastChunk)) eof = true;
+			o->sd_p += offset;
+			o->sd_left -= offset;
 
-			cycles = ARM_DWT_CYCCNT - cycles;
-			if (cycles > o->decode_cycles_max ) o->decode_cycles_max = cycles;
 		}
+
+		int decode_res = AACDecode(o->hAACDecoder, &o->sd_p, (int*)&o->sd_left, o->buf[db]);
+
+		if (!decode_res) {
+			AACGetLastFrameInfo(o->hAACDecoder, &o->aacFrameInfo);
+			o->decoded_length[db] = o->aacFrameInfo.outputSamps;
+		} else {
+			AudioPlaySdAac::lastError = decode_res;
+			eof = true;
+			//goto aacend;
+		}
+
+		//if (!o->isRAW && (o->fposition() > o->lastChunk)) eof = true;
+
+		cycles = ARM_DWT_CYCCNT - cycles;
+		if (cycles > o->decode_cycles_max ) o->decode_cycles_max = cycles;
+	}
 	} //switch
 
 aacend:
