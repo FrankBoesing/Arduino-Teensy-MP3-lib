@@ -291,7 +291,7 @@ void AudioPlaySdAac::update(void)
 	int db = decoding_block;
 	if (!NVIC_IS_ACTIVE(irq_audiocodec))
 		if (decoded_length[db] == 0)
-			NVIC_TRIGGER_INTERRUPT(irq_audiocodec);
+			NVIC_TRIGGER_IRQ(irq_audiocodec);
 
 	//determine the block we're playing from
 	int playing_block = 1 - db;

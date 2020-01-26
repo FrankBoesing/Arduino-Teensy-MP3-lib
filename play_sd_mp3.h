@@ -61,11 +61,11 @@ public:
 	}
 
 protected:
-	uint8_t     *sd_buf;
-	uint8_t     *sd_p;
+	uint8_t *sd_buf;
+	uint8_t *sd_p;
 	int sd_left;
 
-	short     *buf[2];
+	short *buf[2];
 	size_t decoded_length[2];
 	size_t decoding_block;
 	unsigned int decoding_state;  //state 0: read sd, state 1: decode
@@ -76,10 +76,10 @@ protected:
 	HMP3Decoder hMP3Decoder;
 	MP3FrameInfo mp3FrameInfo;
 
-	int irq_audiocodec = 0;
-	int idx_audiocodec = 0;
+	int irq_audiocodec;
+	int idx_audiocodec;
 	int play(void);
-	void update(void);
+	_FAST void update(void);
 	friend void decodeMp3(AudioPlaySdMp3 *o);
 
 };

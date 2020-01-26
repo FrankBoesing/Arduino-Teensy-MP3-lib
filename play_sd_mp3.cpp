@@ -37,8 +37,7 @@
  */
 
 /* The Helix-Library is modified for Teensy 3.1 */
-
-// Total RAM Usage: 35 KB
+// Total RAM Usage: ~35 KB
 
 
 #include "play_sd_mp3.h"
@@ -85,41 +84,47 @@ void AudioPlaySdMp3::stop(void)
    };
  */
 
-void intDecode0(void) {
+_FAST void intDecode0(void) {
 	AudioPlaySdMp3 *o = mp3objptr[0];
 	decodeMp3(o);
 }
 
-void intDecode1(void) {
+_FAST void intDecode1(void) {
 	AudioPlaySdMp3 *o = mp3objptr[1];
 	decodeMp3(o);
 }
-void intDecode2(void) {
+
+_FAST void intDecode2(void) {
 	AudioPlaySdMp3 *o = mp3objptr[2];
 	decodeMp3(o);
 }
-void intDecode3(void) {
+
+_FAST void intDecode3(void) {
 	AudioPlaySdMp3 *o = mp3objptr[3];
 	decodeMp3(o);
 }
-void intDecode4(void) {
+
+_FAST void intDecode4(void) {
 	AudioPlaySdMp3 *o = mp3objptr[4];
 	decodeMp3(o);
 }
-void intDecode5(void) {
+
+_FAST void intDecode5(void) {
 	AudioPlaySdMp3 *o = mp3objptr[5];
 	decodeMp3(o);
 }
-void intDecode6(void) {
+
+_FAST void intDecode6(void) {
 	AudioPlaySdMp3 *o = mp3objptr[6];
 	decodeMp3(o);
 }
-void intDecode7(void) {
+
+_FAST void intDecode7(void) {
 	AudioPlaySdMp3 *o = mp3objptr[7];
 	decodeMp3(o);
 }
 
-void (*const intvects[8])(void) = {
+_FLASH void (*const intvects[8])(void) = {
 	&intDecode0, &intDecode1, &intDecode2, &intDecode3,
 	&intDecode4, &intDecode5, &intDecode6, &intDecode7
 };
@@ -129,27 +134,40 @@ int AudioPlaySdMp3::play(void)
 	lastError = ERR_CODEC_NONE;
 
 	//find an unused interrupt:
-	int irqn = 0;
-	do {
-		idx_audiocodec = irqn;
-		irq_audiocodec = irq_list[irqn++];
-		if (irq_audiocodec == 0) {
-			return ERR_CODEC_NOINTERRUPT;
+	irq_audiocodec = idx_audiocodec = 0;
+	for (unsigned irqn = 0; irqn < NUM_IRQS; irqn++) {
+		if (!(NVIC_IS_ENABLED(irq_list[irqn])) ) {
+			irq_audiocodec = irq_list[irqn];
+			idx_audiocodec = irqn;
+			break;
 		}
 	}
-	while ( NVIC_IS_ENABLED(irq_audiocodec) );
+
+	if (!irq_audiocodec) {
+		lastError = ERR_CODEC_NOINTERRUPT;
+		return lastError;
+	}
 
 	initVars();
 
 	sd_buf = allocBuffer(MP3_SD_BUF_SIZE);
-	if (!sd_buf) return ERR_CODEC_OUT_OF_MEMORY;
+	if (!sd_buf) {
+		lastError = ERR_CODEC_OUT_OF_MEMORY;
+		return lastError;
+	}
 
 	buf[0] = (short *) malloc(MP3_BUF_SIZE * sizeof(int16_t));
 	buf[1] = (short *) malloc(MP3_BUF_SIZE * sizeof(int16_t));
 
-	hMP3Decoder = MP3InitDecoder();
+	if (!buf[0] || !buf[1])
+	{
+		lastError = ERR_CODEC_OUT_OF_MEMORY;
+		stop();
+		return lastError;
+	}
 
-	if (!buf[0] || !buf[1] || !hMP3Decoder)
+	hMP3Decoder = MP3InitDecoder();
+	if (!hMP3Decoder)
 	{
 		lastError = ERR_CODEC_OUT_OF_MEMORY;
 		stop();
@@ -202,17 +220,14 @@ int AudioPlaySdMp3::play(void)
 
 	//_VectorsRam[irq_audiocodec + 16] = &decodeMp3;
 	_VectorsRam[irq_audiocodec + 16] = intvects[idx_audiocodec];
-
-	initSwi(irq_audiocodec);
-
 	playing = codec_playing;
+	initSwi(irq_audiocodec);
 
 	return lastError;
 }
 
 //decoding-interrupt
-//void decodeMp3(const int idx)
-void decodeMp3(AudioPlaySdMp3 *o)
+_FAST void decodeMp3(AudioPlaySdMp3 *o)
 {
 
 	//AudioPlaySdMp3 *o = mp3objptr[0];
@@ -292,7 +307,7 @@ mp3end:
 }
 
 //runs in ISR
-__attribute__ ((optimize("O2")))
+_FAST
 void AudioPlaySdMp3::update(void)
 {
 	audio_block_t *block_left;
@@ -304,11 +319,10 @@ void AudioPlaySdMp3::update(void)
 	//chain decoder-interrupt.
 	//to give the user-sketch some cpu-time, only chain
 	//if the swi is not active currently.
-	//In addition, check before if there waits work for it.
 	int db = decoding_block;
-	if (!NVIC_IS_ACTIVE(irq_audiocodec))
-		if (decoded_length[db] == 0)
-			NVIC_TRIGGER_INTERRUPT(irq_audiocodec);
+	if (decoded_length[db] == 0)
+		if (!NVIC_IS_ACTIVE(irq_audiocodec))
+			NVIC_TRIGGER_IRQ(irq_audiocodec);
 
 	//determine the block we're playing from
 	int playing_block = 1 - db;

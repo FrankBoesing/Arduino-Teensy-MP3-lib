@@ -54,22 +54,26 @@
 #define ERR_CODEC_FORMAT      3 //File is not 44.1 KHz, 16Bit mono or stereo
 #define ERR_CODEC_NOINTERRUPT 4
 
-#define IRQ_AUDIO     IRQ_SOFTWARE  // see AudioStream.cpp
+//#define IRQ_AUDIO     IRQ_SOFTWARE  // see AudioStream.cpp
+//#define PATCH_PRIO      {if (NVIC_GET_PRIORITY(IRQ_AUDIO) == IRQ_AUDIOCODEC_PRIO) {NVIC_SET_PRIORITY(IRQ_AUDIO, IRQ_AUDIOCODEC_PRIO-16);}}
 
 #define IRQ_AUDIOCODEC_PRIO 240       // lowest priority
+#define NUM_IRQS 8
 
 #define AUDIOCODECS_SAMPLE_RATE     (((int)(AUDIO_SAMPLE_RATE / 100)) * 100) //44100
 
-#define NVIC_STIR     (*(volatile uint32_t *)0xE000EF00) //Software Trigger Interrupt Register
-#define NVIC_TRIGGER_INTERRUPT(x)    NVIC_STIR = (x)
-#define NVIC_IS_ACTIVE(n) (*((volatile uint32_t *)0xE000E300 + ((n) >> 5)) & (1 << ((n) & 31)))
-
-//#define PATCH_PRIO      {if (NVIC_GET_PRIORITY(IRQ_AUDIO) == IRQ_AUDIOCODEC_PRIO) {NVIC_SET_PRIORITY(IRQ_AUDIO, IRQ_AUDIOCODEC_PRIO-16);}}
+#if defined(__IMXRT1062__)
+#define _FAST FASTRUN
+#define _FLASH PROGMEM
+#define _SLOW FLASHMEM
+#else
+#define _FAST
+#define _FLASH
+#define _SLOW
+#endif
 
 #define SERFLASH_CS         6 //Chip Select W25Q128FV SPI Flash
 #define SPICLOCK      30000000
-
-#define NUM_IRQS 8
 
 extern const uint8_t irq_list[NUM_IRQS];
 
@@ -193,8 +197,10 @@ protected:
 	void initVars(void) {
 		samples_played = _channels = bitrate = decode_cycles = decode_cycles_read = decode_cycles_max = decode_cycles_max_read = 0; playing = codec_stopped;
 	}
+
 	void initSwi(int irq) {
 		//PATCH_PRIO;*
+		NVIC_CLEAR_PENDING(irq);
 		NVIC_SET_PRIORITY(irq, IRQ_AUDIOCODEC_PRIO);
 		NVIC_ENABLE_IRQ(irq);
 	}
