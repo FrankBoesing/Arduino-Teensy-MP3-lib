@@ -40,8 +40,8 @@
 #include <AudioStream.h>
 #else
 #define AUDIO_BLOCK_SAMPLES 128
-#endif 
- 
+#endif
+
 //Fast copy decoded data (interleaved LRLRLR) to the two audiobuffers (LLL, RRR)
 
  .cpu cortex-m4
@@ -65,7 +65,7 @@
 	.align 2
 .loop:
 
-	.irp offset, 1,2,3,4
+	//.irp offset, 1,2
 
 	//load 8 words (32 byte)  at once into r3-r10 increase adress of r2
 	ldmia r2!,{r3, r4, r5, r6, r7, r8, r9, r10}
@@ -86,10 +86,10 @@
 	pkhtb r6, r10, r9, asr #16
 	stmia r1!,{r5,r6}
 
-	.endr
+	//.endr
 
 	cmp r14, r0
-	bne .loop	
+	bne .loop
 
 	pop	{r4-r11,r14}
 

@@ -50,23 +50,26 @@
 
 //#define CODEC_DEBUG
 
-static AudioPlaySdMp3 * mp3objptr[NUM_IRQS];
+static AudioPlaySdMp3 * mp3objptr[NUM_IRQS] = {nullptr};
 void decodeMp3(AudioPlaySdMp3 *o);
 
 void AudioPlaySdMp3::stop(void)
 {
-	if (irq_audiocodec) {
-		NVIC_DISABLE_IRQ(irq_audiocodec);
-		irq_audiocodec = 0;
+	stopSwi(irq_audiocodec);
+	irq_audiocodec = 0;
+	if (idx_audiocodec) {
+		mp3objptr[idx_audiocodec] = nullptr;
+		idx_audiocodec = 0;
 	}
 	playing = codec_stopped;
 
-	if (buf[1]) {free(buf[1]); buf[1] = NULL;}
-	if (buf[0]) {free(buf[0]); buf[0] = NULL;}
+	if (buf[1]) {free(buf[1]); buf[1] = nullptr;}
+	if (buf[0]) {free(buf[0]); buf[0] = nullptr;}
 	freeBuffer();
-	if (hMP3Decoder) {MP3FreeDecoder(hMP3Decoder); hMP3Decoder = NULL;};
+	if (hMP3Decoder) {MP3FreeDecoder(hMP3Decoder); hMP3Decoder = nullptr;};
 
 	fclose();
+	Serial.println("stopped");
 }
 /*
    float AudioPlaySdMp3::processorUsageMaxDecoder(void){
@@ -132,7 +135,7 @@ _FLASH void (*const intvects[8])(void) = {
 int AudioPlaySdMp3::play(void)
 {
 	lastError = ERR_CODEC_NONE;
-
+	Serial.println("start try");
 	//find an unused interrupt:
 	irq_audiocodec = idx_audiocodec = 0;
 	for (unsigned irqn = 0; irqn < NUM_IRQS; irqn++) {
@@ -145,6 +148,7 @@ int AudioPlaySdMp3::play(void)
 
 	if (!irq_audiocodec) {
 		lastError = ERR_CODEC_NOINTERRUPT;
+		stop();
 		return lastError;
 	}
 
@@ -153,6 +157,7 @@ int AudioPlaySdMp3::play(void)
 	sd_buf = allocBuffer(MP3_SD_BUF_SIZE);
 	if (!sd_buf) {
 		lastError = ERR_CODEC_OUT_OF_MEMORY;
+		stop();
 		return lastError;
 	}
 
@@ -218,11 +223,9 @@ int AudioPlaySdMp3::play(void)
 	}
 	decoding_block = 1;
 
-	//_VectorsRam[irq_audiocodec + 16] = &decodeMp3;
-	_VectorsRam[irq_audiocodec + 16] = intvects[idx_audiocodec];
 	playing = codec_playing;
-	initSwi(irq_audiocodec);
-
+	initSwi(irq_audiocodec, intvects[idx_audiocodec]);
+	Serial.println("started");
 	return lastError;
 }
 
@@ -231,6 +234,7 @@ _FAST void decodeMp3(AudioPlaySdMp3 *o)
 {
 
 	//AudioPlaySdMp3 *o = mp3objptr[0];
+	if (o == nullptr) return;
 
 	int db = o->decoding_block;
 
@@ -321,8 +325,7 @@ void AudioPlaySdMp3::update(void)
 	//if the swi is not active currently.
 	int db = decoding_block;
 	if (decoded_length[db] == 0)
-		if (!NVIC_IS_ACTIVE(irq_audiocodec))
-			NVIC_TRIGGER_IRQ(irq_audiocodec);
+		if (!NVIC_IS_ACTIVE(irq_audiocodec) ) NVIC_SET_PENDING(irq_audiocodec);
 
 	//determine the block we're playing from
 	int playing_block = 1 - db;
@@ -330,7 +333,7 @@ void AudioPlaySdMp3::update(void)
 
 	// allocate the audio blocks to transmit
 	block_left = allocate();
-	if (block_left == NULL) return;
+	if (block_left == nullptr) return;
 
 	uintptr_t pl = play_pos;
 
@@ -338,7 +341,7 @@ void AudioPlaySdMp3::update(void)
 		// if we're playing stereo, allocate another
 		// block for the right channel output
 		block_right = allocate();
-		if (block_right == NULL) {
+		if (block_right == nullptr) {
 			release(block_left);
 			return;
 		}

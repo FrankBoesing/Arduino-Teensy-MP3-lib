@@ -75,6 +75,7 @@
 #define SERFLASH_CS         6 //Chip Select W25Q128FV SPI Flash
 #define SPICLOCK      30000000
 
+extern void (*unused_interrupt_vector)();
 extern const uint8_t irq_list[NUM_IRQS];
 
 extern "C" { void memcpy_frominterleaved(int16_t *dst1, int16_t *dst2, int16_t *src); }
@@ -166,14 +167,14 @@ public:
 	}
 	unsigned lengthMillis(void) {
 		return max(fsize() / (bitrate / 8 ) * 1000,  positionMillis());
-	}                                                                                             //Ignores VBR
+	} //Ignores VBR
 	int channels(void) {
 		return _channels;
 	}
 	int bitRate(void) {
 		return bitrate;
 	}
-	void processorUsageMaxResetDecoder(void){
+	void processorUsageMaxResetDecoder(void) {
 		__disable_irq(); decode_cycles_max = decode_cycles_max_read = 0; __enable_irq();
 	}
 	int freeRam(void);
@@ -198,13 +199,29 @@ protected:
 		samples_played = _channels = bitrate = decode_cycles = decode_cycles_read = decode_cycles_max = decode_cycles_max_read = 0; playing = codec_stopped;
 	}
 
-	void initSwi(int irq) {
-		//PATCH_PRIO;*
-		NVIC_CLEAR_PENDING(irq);
-		NVIC_SET_PRIORITY(irq, IRQ_AUDIOCODEC_PRIO);
-		NVIC_ENABLE_IRQ(irq);
+	void initSwi(int irq, void (*vector)() ) {
+		if (irq) {
+			NVIC_DISABLE_IRQ(irq);
+			NVIC_CLEAR_PENDING(irq);
+			NVIC_SET_PRIORITY(irq, IRQ_AUDIOCODEC_PRIO);
+			asm volatile ("dsb");
+			if (vector == NULL) vector = unused_interrupt_vector;
+			_VectorsRam[irq + 16] = vector;
+			asm volatile ("dsb");
+			if (vector) NVIC_ENABLE_IRQ(irq);
+		}
+		asm volatile ("dsb");
 	}
 
+	void stopSwi(int irq) {
+		if (irq) {
+			NVIC_DISABLE_IRQ(irq);
+			asm volatile ("dsb");
+			NVIC_SET_PRIORITY(irq, 128);
+			_VectorsRam[irq + 16] = unused_interrupt_vector;
+			asm volatile ("dsb");
+		}
+	}
 };
 
 #endif

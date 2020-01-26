@@ -144,8 +144,8 @@ int AudioPlaySdFlac::play(void)
 	}
 
 #ifdef FLAC_USE_SWI
-	_VectorsRam[irq_audiocodec + 16] = &decodeFlac;
-	initSwi(irq_audiocodec);
+	//_VectorsRam[irq_audiocodec + 16] = &decodeFlac;
+	initSwi(irq_audiocodec, &decodeFlac);
 #endif
 
 	playing = codec_playing;

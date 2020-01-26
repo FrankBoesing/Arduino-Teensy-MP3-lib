@@ -248,8 +248,8 @@ int AudioPlaySdAac::play(void){
 		return lastError;
 	}
 
-	_VectorsRam[irq_audiocodec + 16] = &decodeAac;
-	initSwi(irq_audiocodec);
+//	_VectorsRam[irq_audiocodec + 16] = &decodeAac;
+	initSwi(irq_audiocodec, &decodeAac);
 
 	decoded_length[0] = 0;
 	decoded_length[1] = 0;

@@ -70,7 +70,7 @@ public:
 	}
 
 	_FAST int16_t *alloc(void) {
-		int16_t *ret = NULL;
+		int16_t *ret = nullptr;
 		__disable_irq();
 		if (freespace > 0)
 		{
@@ -84,7 +84,7 @@ public:
 	}
 
 	_FAST int16_t *get(void) {
-		int16_t *ret = NULL;
+		int16_t *ret = nullptr;
 		__disable_irq();
 		if (freespace < bufsize) {
 			freespace++;
@@ -98,7 +98,7 @@ public:
 
 protected:
 	void init(void) {
-		bufsize = freespace = read = write = 0; data = NULL;
+		bufsize = freespace = read = write = 0; data = nullptr;
 	}
 	int16_t *data;
 	size_t bufsize, freespace, read, write;

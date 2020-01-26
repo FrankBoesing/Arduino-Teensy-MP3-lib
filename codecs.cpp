@@ -42,7 +42,7 @@
 #include "SD.h"
 
 // use "reserved" (free) interrupt vectors
-#if /*defined(__IMXRT1052__) && !*/ defined(__IMXRT1062__)
+#if defined(__IMXRT1062__)
 //#define IRQ_AUDIOCODEC    IRQ_Reserved1
 const uint8_t irq_list[NUM_IRQS] = {
 	IRQ_Reserved1, IRQ_Reserved2, IRQ_Reserved3, IRQ_Reserved4,
