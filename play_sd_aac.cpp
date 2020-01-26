@@ -51,18 +51,23 @@
 #define DECODE_NUM_STATES 2                 //How many steps in decode() ?
 #define CODEC_DEBUG
 
-static AudioPlaySdAac   *aacobjptr;
-void decodeAac(void);
+static AudioPlaySdAac * aacobjptr[NUM_IRQS] = {nullptr};
+void decodeAac(const int idx);
 
 void AudioPlaySdAac::stop(void)
 {
-	NVIC_DISABLE_IRQ(irq_audiocodec);
-
+	stopSwi(irq_audiocodec);
+	irq_audiocodec = 0;
+	if (idx_audiocodec) {
+		aacobjptr[idx_audiocodec] = nullptr;
+		idx_audiocodec = 0;
+	}
 	playing = codec_stopped;
-	if (buf[1]) {free(buf[1]); buf[1] = NULL;}
-	if (buf[0]) {free(buf[0]); buf[0] = NULL;}
+
+	if (buf[1]) {free(buf[1]); buf[1] = nullptr;}
+	if (buf[0]) {free(buf[0]); buf[0] = nullptr;}
 	freeBuffer();
-	if (hAACDecoder) {AACFreeDecoder(hAACDecoder); hAACDecoder = NULL;};
+	if (hAACDecoder) {AACFreeDecoder(hAACDecoder); hAACDecoder = nullptr;};
 	fclose();
 }
 
@@ -191,13 +196,70 @@ void AudioPlaySdAac::setupDecoder(int channels, int samplerate, int profile)
 	AACSetRawBlockParams(hAACDecoder, 0, &aacFrameInfo);
 }
 
+_FAST static void intDecode0(void) {
+	decodeAac(0);
+}
+
+_FAST static void intDecode1(void) {
+	decodeAac(1);
+}
+
+_FAST static void intDecode2(void) {
+	decodeAac(2);
+}
+
+_FAST static void intDecode3(void) {
+	decodeAac(3);
+}
+
+_FAST static void intDecode4(void) {
+	decodeAac(4);
+}
+
+_FAST static void intDecode5(void) {
+	decodeAac(5);
+}
+
+_FAST static void intDecode6(void) {
+	decodeAac(6);
+}
+
+_FAST static void intDecode7(void) {
+	decodeAac(7);
+}
+
+_FLASH void (*const intvects[8])(void) = {
+	&intDecode0, &intDecode1, &intDecode2, &intDecode3,
+	&intDecode4, &intDecode5, &intDecode6, &intDecode7
+};
+
 int AudioPlaySdAac::play(void){
 	lastError = ERR_CODEC_NONE;
-	initVars();
-	sd_buf = allocBuffer(AAC_SD_BUF_SIZE);
-	if (!sd_buf) return ERR_CODEC_OUT_OF_MEMORY;
 
-	aacobjptr = this;
+
+	//find an unused interrupt:
+	irq_audiocodec = idx_audiocodec = 0;
+	for (unsigned irqn = 0; irqn < NUM_IRQS; irqn++) {
+		if (!(NVIC_IS_ENABLED(irq_list[irqn])) ) {
+			irq_audiocodec = irq_list[irqn];
+			idx_audiocodec = irqn;
+			break;
+		}
+	}
+
+	if (!irq_audiocodec) {
+		lastError = ERR_CODEC_NOINTERRUPT;
+		stop();
+		return lastError;
+	}
+
+	initVars();
+
+	sd_buf = allocBuffer(AAC_SD_BUF_SIZE);
+	if (!sd_buf) {
+		stop();
+		return ERR_CODEC_OUT_OF_MEMORY;
+	}
 
 	buf[0] = (short *) malloc(AAC_BUF_SIZE * sizeof(int16_t));
 	buf[1] = (short *) malloc(AAC_BUF_SIZE * sizeof(int16_t));
@@ -248,15 +310,14 @@ int AudioPlaySdAac::play(void){
 		return lastError;
 	}
 
-//	_VectorsRam[irq_audiocodec + 16] = &decodeAac;
-	initSwi(irq_audiocodec, &decodeAac);
-
 	decoded_length[0] = 0;
 	decoded_length[1] = 0;
 	decoding_state = 0;
 	decoding_block = 0;
 
-	for (int i = 0; i < DECODE_NUM_STATES; i++) decodeAac();
+	aacobjptr[idx_audiocodec] = this;
+	//for (int i = 0; i < DECODE_NUM_STATES; i++) decodeAac();
+	for (int i = 0; i < DECODE_NUM_STATES; i++) intvects[idx_audiocodec]();
 
 	if ((aacFrameInfo.sampRateOut != AUDIOCODECS_SAMPLE_RATE ) || (aacFrameInfo.nChans > 2)) {
 		//Serial.println("incompatible AAC file.");
@@ -268,10 +329,7 @@ int AudioPlaySdAac::play(void){
 	decoding_block = 1;
 
 	playing = codec_playing;
-
-#ifdef CODEC_DEBUG
-//	Serial.printf("RAM: %d\r\n",ram-freeRam());
-#endif
+	initSwi(irq_audiocodec, intvects[idx_audiocodec]);
 	return lastError;
 }
 
@@ -289,9 +347,9 @@ void AudioPlaySdAac::update(void)
 	//if the swi is not active currently.
 	//In addition, check before if there waits work for it.
 	int db = decoding_block;
-	if (!NVIC_IS_ACTIVE(irq_audiocodec))
-		if (decoded_length[db] == 0)
-			NVIC_TRIGGER_IRQ(irq_audiocodec);
+	if (decoded_length[db] == 0)
+		if (!NVIC_IS_ACTIVE(irq_audiocodec))
+			NVIC_SET_PENDING(irq_audiocodec);
 
 	//determine the block we're playing from
 	int playing_block = 1 - db;
@@ -352,9 +410,11 @@ void AudioPlaySdAac::update(void)
 }
 
 //decoding-interrupt
-void decodeAac(void)
+_FAST void decodeAac(const int idx)
 {
-	AudioPlaySdAac *o = aacobjptr;
+	AudioPlaySdAac *o = aacobjptr[idx];
+	if (o == nullptr) return;
+
 	int db = o->decoding_block;
 	if (o->decoded_length[db]) return; //this block is playing, do NOT fill it
 

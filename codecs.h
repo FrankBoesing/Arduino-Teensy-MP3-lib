@@ -217,6 +217,7 @@ protected:
 		if (irq) {
 			NVIC_DISABLE_IRQ(irq);
 			asm volatile ("dsb");
+			NVIC_CLEAR_PENDING(irq);
 			NVIC_SET_PRIORITY(irq, 128);
 			_VectorsRam[irq + 16] = unused_interrupt_vector;
 			asm volatile ("dsb");

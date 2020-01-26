@@ -447,7 +447,7 @@ void AudioPlaySdFlac::update(void)
 	//to give the user-sketch some cpu-time, only chain
 	//if the swi is not active currently.
 	if (!NVIC_IS_ACTIVE(irq_audiocodec))
-		NVIC_TRIGGER_IRQ(irq_audiocodec);
+		NVIC_SET_PENDING(irq_audiocodec);
 #endif
 }
 

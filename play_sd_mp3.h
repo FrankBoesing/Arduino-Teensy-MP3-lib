@@ -80,7 +80,7 @@ protected:
 	int idx_audiocodec;
 	int play(void);
 	_FAST void update(void);
-	friend void decodeMp3(AudioPlaySdMp3 *o);
+	friend void decodeMp3(const int idx);
 
 };
 

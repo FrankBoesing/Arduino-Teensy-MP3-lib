@@ -87,7 +87,8 @@ protected:
 	HAACDecoder hAACDecoder;
 	AACFrameInfo aacFrameInfo;
 
-	int irq_audiocodec = 0;
+	int irq_audiocodec;
+	int idx_audiocodec;
 	int play(void);
 	uint16_t fread16(size_t position);
 	uint32_t fread32(size_t position);
@@ -95,7 +96,7 @@ protected:
 	_ATOM findMp4Atom(const char *atom, const uint32_t posi, const bool loop);
 	bool setupMp4(void);
 	void update(void);
-	friend void decodeAac(void);
+	friend void decodeAac(const int idx);
 };
 
 

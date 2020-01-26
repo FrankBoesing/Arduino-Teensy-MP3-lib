@@ -51,7 +51,7 @@
 //#define CODEC_DEBUG
 
 static AudioPlaySdMp3 * mp3objptr[NUM_IRQS] = {nullptr};
-void decodeMp3(AudioPlaySdMp3 *o);
+void decodeMp3(const int idx);
 
 void AudioPlaySdMp3::stop(void)
 {
@@ -69,7 +69,7 @@ void AudioPlaySdMp3::stop(void)
 	if (hMP3Decoder) {MP3FreeDecoder(hMP3Decoder); hMP3Decoder = nullptr;};
 
 	fclose();
-	Serial.println("stopped");
+
 }
 /*
    float AudioPlaySdMp3::processorUsageMaxDecoder(void){
@@ -87,44 +87,36 @@ void AudioPlaySdMp3::stop(void)
    };
  */
 
-_FAST void intDecode0(void) {
-	AudioPlaySdMp3 *o = mp3objptr[0];
-	decodeMp3(o);
+_FAST static void intDecode0(void) {
+	decodeMp3(0);
 }
 
-_FAST void intDecode1(void) {
-	AudioPlaySdMp3 *o = mp3objptr[1];
-	decodeMp3(o);
+_FAST static void intDecode1(void) {
+	decodeMp3(1);
 }
 
-_FAST void intDecode2(void) {
-	AudioPlaySdMp3 *o = mp3objptr[2];
-	decodeMp3(o);
+_FAST static void intDecode2(void) {
+	decodeMp3(2);
 }
 
-_FAST void intDecode3(void) {
-	AudioPlaySdMp3 *o = mp3objptr[3];
-	decodeMp3(o);
+_FAST static void intDecode3(void) {
+	decodeMp3(3);
 }
 
-_FAST void intDecode4(void) {
-	AudioPlaySdMp3 *o = mp3objptr[4];
-	decodeMp3(o);
+_FAST static void intDecode4(void) {
+	decodeMp3(4);
 }
 
-_FAST void intDecode5(void) {
-	AudioPlaySdMp3 *o = mp3objptr[5];
-	decodeMp3(o);
+_FAST static void intDecode5(void) {
+	decodeMp3(5);
 }
 
-_FAST void intDecode6(void) {
-	AudioPlaySdMp3 *o = mp3objptr[6];
-	decodeMp3(o);
+_FAST static void intDecode6(void) {
+	decodeMp3(6);
 }
 
-_FAST void intDecode7(void) {
-	AudioPlaySdMp3 *o = mp3objptr[7];
-	decodeMp3(o);
+_FAST static void intDecode7(void) {
+	decodeMp3(7);
 }
 
 _FLASH void (*const intvects[8])(void) = {
@@ -135,7 +127,7 @@ _FLASH void (*const intvects[8])(void) = {
 int AudioPlaySdMp3::play(void)
 {
 	lastError = ERR_CODEC_NONE;
-	Serial.println("start try");
+
 	//find an unused interrupt:
 	irq_audiocodec = idx_audiocodec = 0;
 	for (unsigned irqn = 0; irqn < NUM_IRQS; irqn++) {
@@ -225,15 +217,15 @@ int AudioPlaySdMp3::play(void)
 
 	playing = codec_playing;
 	initSwi(irq_audiocodec, intvects[idx_audiocodec]);
-	Serial.println("started");
+
 	return lastError;
 }
 
 //decoding-interrupt
-_FAST void decodeMp3(AudioPlaySdMp3 *o)
+_FAST void decodeMp3(const int idx)
 {
 
-	//AudioPlaySdMp3 *o = mp3objptr[0];
+	AudioPlaySdMp3 *o = mp3objptr[idx];
 	if (o == nullptr) return;
 
 	int db = o->decoding_block;
